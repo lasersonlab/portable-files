@@ -3,11 +3,11 @@ import scalajs._
 default(
   group("org.lasersonlab"),
   versions(
-    hammerlab.          bytes → "1.3.0",
     hammerlab.     math.utils → "2.4.0",
     hammerlab.          types → "1.5.0",
 
-    dom → "0.9.6"
+    dom → "0.9.6",
+    time → "2.0.0-M13",
   ),
   circe.version := "0.11.1",
 )
@@ -15,7 +15,7 @@ default(
 lazy val concurrent =
   cross
     .settings(
-      v"0.1",
+      v"0.1.0",
       dep(
         case_app,
         cats
@@ -26,7 +26,7 @@ lazy val `concurrent-x` = concurrent.x
 lazy val files =
   cross
     .settings(
-      v"0.1",
+      v"0.1.0",
       name := "portable-files",
       dep(
         cats,
@@ -39,14 +39,12 @@ lazy val files =
 
         fs2,
 
-        hammerlab.bytes,
         hammerlab.types,
         hammerlab.math.utils,
 
         sourcecode,
         sttp,
-
-        "io.github.cquiroz" ^^ "scala-java-time" ^ "2.0.0-M13",
+        time,
       ),
       enableMacroParadise,
       utest
