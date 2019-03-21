@@ -6,6 +6,7 @@ trait threads {
   implicit def unwrapNumThreads(numThreads: NumThreads): Int = numThreads.value
 
   object pool {
+    implicit val `1` = default
     implicit val default = scala.scalajs.concurrent.JSExecutionContext.Implicits.runNow
   }
 }
