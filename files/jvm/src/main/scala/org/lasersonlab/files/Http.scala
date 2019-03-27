@@ -10,8 +10,7 @@ import akka.http.scaladsl.model.HttpMethods.{ GET, HEAD }
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import cats.implicits._
-import org.lasersonlab.files.caching.Config
-import org.lasersonlab.files.http.{ Base, Defaults }
+import org.lasersonlab.files.http.Base
 import org.lasersonlab.files.http.Defaults
 import org.lasersonlab.files.{ http ⇒ h }
 

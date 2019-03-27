@@ -15,7 +15,7 @@ default(
 lazy val concurrent =
   cross
     .settings(
-      v"0.1.0",
+      v"0.2.0",
       dep(
         case_app,
         cats
@@ -26,7 +26,7 @@ lazy val `concurrent-x` = concurrent.x
 lazy val files =
   cross
     .settings(
-      v"0.1.0",
+      v"0.2.0",
       name := "portable-files",
       dep(
         cats,
@@ -47,6 +47,7 @@ lazy val files =
         time,
       ),
       enableMacroParadise,
+      publishTestJar,
       utest
     )
     .jvmSettings(
