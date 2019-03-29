@@ -180,9 +180,6 @@ abstract class Uri()(implicit val ec: ExecutionContext)
       }
   }
 
-  private val _buffer = ByteBuffer.allocate(blockSize)
-
-  // TODO: this is just re-fetching blocks on every access / not how you do caching with referential transparency
   val blocks =
     new util.LinkedHashMap[Long, F[Array[Byte]]](
       (maximumSize / blockSize).toInt,

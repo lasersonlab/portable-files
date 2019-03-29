@@ -16,10 +16,13 @@ lazy val concurrent =
   cross
     .settings(
       v"0.2.0",
+      scalac.xms(1 GB),
+      scalac.xmx(4 GB),
       dep(
         case_app,
         cats
       ),
+      hammerlab.test.version := "2.0.0".snapshot
     )
 lazy val `concurrent-x` = concurrent.x
 
@@ -80,7 +83,7 @@ lazy val files =
     )
 lazy val `files-x` = files.x
 
-lazy val all =
+lazy val `portable-files` =
   root(
      `concurrent-x` ,
           `files-x` ,
