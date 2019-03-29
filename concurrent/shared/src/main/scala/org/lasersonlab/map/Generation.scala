@@ -25,7 +25,7 @@ object Generation {
     }
   }
 
-  implicit val long: Aux[Long] = {
+  implicit def long: Aux[Long] = {
     val _ord = implicitly[Ordering[Long]]
     new Generation {
       type T = Long

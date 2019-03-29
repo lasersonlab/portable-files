@@ -1,10 +1,16 @@
 package org.lasersonlab.map
 
 import org.lasersonlab.map.ConcurrentLRUMap.Value
+import slogging._
 
 import scala.collection.concurrent.TrieMap
+import math.max
 
-case class ConcurrentLRUMap[K, V](maxSize: Int)(implicit val generation: Generation) {
+case class ConcurrentLRUMap[K, V](maxSize: Int)(implicit val generation: Generation)
+  extends LazyLogging {
+  import logger._
+
+  val minSize = maxSize / 2
 
   implicit val g: Generation.Aux[G] = generation
   type G = generation.T
@@ -17,51 +23,80 @@ case class ConcurrentLRUMap[K, V](maxSize: Int)(implicit val generation: Generat
 
   def size = _map.size
 
-  def put(k: K, v: V): Option[V] = {
+  def put(k: K, v: V, minSize: Int = minSize): Option[V] = {
     _map
       .put(k, Value(v))
       .map { _.value }
       .orElse {
-        maybeCompact()
+        maybeCompact(minSize)
         None
       }
   }
 
-  def putIfAbsent(k: K, v: V): Option[V] = {
+  def putIfAbsent(k: K, v: V, minSize: Int = minSize): Option[V] = {
+    val value = Value(v)
     _map
-      .putIfAbsent(k, Value(v))
+      .putIfAbsent(k, value)
       .map {
-        case value @ Value(v, _) ⇒
-          access(k, value)
-          v
+        case Value(existing, _) ⇒
+          access(k, Value(existing, value.generation))
+          existing
       }
       .orElse {
-        maybeCompact()
+        maybeCompact(minSize)
         None
       }
   }
 
   /** If [[_map]] is too large, drop elements until we are at half of [[maxSize]] */
-  private def maybeCompact(): Unit = {
-    if (_map.size > maxSize) {
-      _map
-        .toVector
-        .sortBy { _._2.generation }
-        .iterator
-        .drop { maxSize / 2 }
-        .filterNot {
-          case (k, v) ⇒
-            _map.remove(k, v)
-        }
+  private def maybeCompact(minSize: Int): Unit = {
+    val size = _map.size
+    if (size > maxSize) {
+      val numToRemove = size - minSize
+      val removalFailures =
+        _map
+          .toVector
+          .sortBy { _._2.generation }
+          .iterator
+          .take { numToRemove }
+          .filterNot {
+            case (k, v) ⇒
+              if (_map.remove(k, v))
+                true
+              else {
+                debug(s"Failed to page out $k → $v")
+                false
+              }
+          }
+          .size
+
+      debug({
+        val removed = numToRemove - removalFailures
+        s"Compacted $size elements down to ${size - removed}; successfully removed $removed, $removalFailures were updated during compaction"
+      })
     }
   }
 
-  def +=(k: K, v: V): this.type = { _map.put(k, Value(v)); this }
+  def +=(k: K, v: V): this.type = { put(k, v); this }
+
+  def ++=(kvs: (K, V)*): this.type = {
+    val minSize = max(this.minSize, kvs.size)
+    for {
+      (k, v) ← kvs
+    } {
+      put(k, v, minSize = minSize)
+    }
+    this
+  }
 
   private def access(k: K, v: Value[V, G]): V = {
     _map.put(k, v) match {
-      case Some(Value(v2, g)) if ord.lteq(g, v.generation) ⇒ v.value
-      case Some(v) ⇒ access(k, v)
+      case Some(value @ Value(v2, existing)) if ord.lteq(existing, v.generation) ⇒
+        debug(s"Bumping key $k: $value → $v")
+        v.value
+      case Some(newer) ⇒
+        debug(s"Access superceded: $k, $v by $newer")
+        access(k, v)
       case None ⇒ v.value
     }
   }
@@ -77,15 +112,6 @@ case class ConcurrentLRUMap[K, V](maxSize: Int)(implicit val generation: Generat
           )
       }
 
-  def getOrElseUpdate(k: K, v: ⇒ V): V =
-    _map
-      .get(k)
-      .fold {
-        _map.putIfAbsent(k, Value(v)).fold { v } { _.value }
-      } {
-        _.value
-      }
-
   def iterator: Iterator[(K, V)] = _map.iterator.map { case (k, Value(v, _)) ⇒ (k, v) }
 }
 
@@ -95,5 +121,6 @@ object ConcurrentLRUMap {
   }
   object Value {
     def apply[V, G](v: V)(implicit g: Generation): Value[V, g.T] = Value(v, g())
+    implicit def wrap[V, G](v: V)(implicit g: Generation): Value[V, g.T] = Value(v, g())
   }
 }

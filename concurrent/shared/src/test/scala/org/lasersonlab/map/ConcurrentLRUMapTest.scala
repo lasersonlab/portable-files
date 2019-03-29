@@ -1,6 +1,5 @@
 package org.lasersonlab.map
 
-import cats.data.Ior
 import hammerlab.or._
 import org.hammerlab.cmp.CanEq
 import org.hammerlab.test.Cmp
@@ -10,26 +9,158 @@ class ConcurrentLRUMapTest
   extends hammerlab.Suite
      with Cmps
 {
+  type K = Int
+  type V = String
+  def ??[D](map: ConcurrentLRUMap[Int, String], expected: (K, (V, Long))*)(implicit c1: Cmp.Aux[Map[K, V], D]): Unit = {
+    ==(
+      map
+        .versionedMap
+        .toMap
+        .mapValues {
+          case Value(v, g) ⇒ (v, g.asInstanceOf[Long])
+        }
+        .toVector
+      .sortBy { -_._2._2 },
+      expected
+    )
+    ==(
+      map.map.toMap,
+      expected.toMap.mapValues { _._1 }
+    )
+  }
+
   test("simple") {
     val map = ConcurrentLRUMap[Int, String](6)
-    import map._
+    import map.{ == ⇒ _, _ }
 
-    ===(map, Map())
+    ??(map)
 
-    ===(get(111), None)
-    ===(map, Map())
+    ==(get(111), None)
+    ??(map)
 
-    ===(put(111, "111"), None)
-    ===(map, Map(111 → ("111", 0L)))
+    var `111` = 0L
+    ==(put(111, "111"), None)
+    ??(map, 111 → ("111", `111`))
 
-    ===(get(111), Some("111"))
-    ===(map, Map(111 → ("111", 1L)))
+    ==(get(111), Some("111")); `111` += 1
+    ??(map, 111 → ("111", `111`))
 
-    ===(putIfAbsent(111, "111"), Some("111"))
-    ===(map, Map(111 → ("111", 2L)))
+    ==(putIfAbsent(111, "---"), Some("111")); `111` += 1
+    ??(map, 111 → ("111", `111`))
 
-    ===(get(111), Some("111"))
-    ===(map, Map(111 → ("111", 3L)))
+    ==(get(111), Some("111")); `111` += 1
+    ??(map, 111 → ("111", `111`))
+
+    ==(get(222), None)
+    ??(map, 111 → ("111", `111`))
+
+    var `222` = `111` + 1
+    ==(putIfAbsent(222, "222"), None)
+    ??(
+      map,
+      222 → ("222", `222`),
+      111 → ("111", `111`),
+    )
+
+    ==(get(222), Some("222")); `222` += 1
+    ??(
+      map,
+      222 → ("222", `222`),
+      111 → ("111", `111`),
+    )
+
+    ==(putIfAbsent(111, "---"), Some("111")); `111` = `222` + 1
+    ??(
+      map,
+      111 → ("111", `111`),
+      222 → ("222", `222`),
+    )
+
+    ==(putIfAbsent(222, "---"), Some("222")); `222` = `111` + 1
+    ??(
+      map,
+      222 → ("222", `222`),
+      111 → ("111", `111`),
+    )
+
+    var `333` = `222` + 1
+    var `444` = `333` + 1
+    var `555` = `444` + 1
+    var `666` = `555` + 1
+    ??(
+      map ++= (333 → "333", 444 → "444", 555 → "555", 666 → "666"),
+      666 → ("666", `666`),
+      555 → ("555", `555`),
+      444 → ("444", `444`),
+      333 → ("333", `333`),
+      222 → ("222", `222`),
+      111 → ("111", `111`),
+    )
+
+    var `777` = `666` + 1
+    ??(
+      map += (777, "777"),
+      777 → ("777", `777`),
+      666 → ("666", `666`),
+      555 → ("555", `555`),
+    )
+
+    ==(get(111), None)
+    ==(get(222), None)
+    ==(get(333), None)
+    ==(get(444), None)
+    ??(
+      map,
+      777 → ("777", `777`),
+      666 → ("666", `666`),
+      555 → ("555", `555`),
+    )
+
+    ==(putIfAbsent(444, "444"), None); `444` = `777` + 1
+    ??(
+      map,
+      444 → ("444", `444`),
+      777 → ("777", `777`),
+      666 → ("666", `666`),
+      555 → ("555", `555`),
+    )
+
+    ==(put(333, "ccc"), None); `333` = `444` + 1
+    ??(
+      map,
+      333 → ("ccc", `333`),
+      444 → ("444", `444`),
+      777 → ("777", `777`),
+      666 → ("666", `666`),
+      555 → ("555", `555`),
+    )
+
+    ==(get(555), Some("555")); `555` = `333` + 1
+    ??(
+      map,
+      555 → ("555", `555`),
+      333 → ("ccc", `333`),
+      444 → ("444", `444`),
+      777 → ("777", `777`),
+      666 → ("666", `666`),
+    )
+
+    var `888` = `555` + 1
+    var `999` = `888` + 1
+    ??(
+      map ++= (888 → "888", 999 → "999"),
+      999 → ("999", `999`),
+      888 → ("888", `888`),
+      555 → ("555", `555`),
+    )
+
+    ==(put(555, "eee"), Some("555")); `555` = `999` + 1
+    ??(
+      map,
+      555 → ("eee", `555`),
+      999 → ("999", `999`),
+      888 → ("888", `888`),
+    )
   }
 }
 
@@ -52,31 +183,27 @@ trait Cmps {
     CanEq.Aux[
       ConcurrentLRUMap[K, V],
       RHS,
-      Or[
-        c1.Diff,
-        c2.Diff
-      ]
+      c1.Diff ||
+      c2.Diff
     ] =
     CanEq {
       (l, rhs) ⇒
         val r = map(rhs)
-        Ior.fromOptions(
-          c1(
-            l
-              .map
-              .toMap,
-            r
-              .mapValues { _._1 }
-          ),
-          c2(
-            l
-              .versionedMap
-              .toMap
-              .mapValues {
-                case Value(v, g) ⇒ (v, g.asInstanceOf[Long])
-              },
-            r
-          )
+        c1(
+          l
+            .map
+            .toMap,
+          r
+            .mapValues { _._1 }
+        ) ||
+        c2(
+          l
+            .versionedMap
+            .toMap
+            .mapValues {
+              case Value(v, g) ⇒ (v, g.asInstanceOf[Long])
+            },
+          r
         )
     }
 }
