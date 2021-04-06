@@ -1,17 +1,15 @@
 package org.lasersonlab.map
 
-import hammerlab.or._
-import org.hammerlab.cmp.CanEq
 import org.hammerlab.test.Cmp
-import org.lasersonlab.map.ConcurrentLRUMap.Value
+import org.lasersonlab.map.ConcurrentLRUMapBase.Value
 
 class ConcurrentLRUMapTest
   extends hammerlab.Suite
-     with Cmps
 {
   type K = Int
   type V = String
   def ??[D](map: ConcurrentLRUMap[Int, String], expected: (K, (V, Long))*)(implicit c1: Cmp.Aux[Map[K, V], D]): Unit = {
+    1 should be(2)
     ==(
       map
         .versionedMap
@@ -40,7 +38,7 @@ class ConcurrentLRUMapTest
 
     var `111` = 0L
     ==(put(111, "111"), None)
-    ??(map, 111 → ("111", `111`))
+    ??(map, 111 → ("112", `111`))
 
     ==(get(111), Some("111")); `111` += 1
     ??(map, 111 → ("111", `111`))
@@ -163,48 +161,3 @@ class ConcurrentLRUMapTest
     )
   }
 }
-
-/** Simple typeclass unifying Map[Nothing,Nothing] (as returned by the `Map()` constructor) with any type of Map */
-trait Mapish[M, K, V] {
-  def apply(m: M): Map[K, V]
-}
-object Mapish {
-  implicit def id[K, V]: Mapish[Map[K, V], K, V] = { m ⇒ m }
-  implicit def nothing[K, V]: Mapish[Map[Nothing, Nothing], K, V] = { _.asInstanceOf[Map[K, V]] }
-}
-
-trait Cmps {
-  implicit def cmpVersioned[K, V, RHS](
-    implicit
-    c1: Cmp[Map[K,  V       ]],
-    c2: Cmp[Map[K, (V, Long)]],
-    map: Mapish[RHS, K, (V, Long)],
-  ):
-    CanEq.Aux[
-      ConcurrentLRUMap[K, V],
-      RHS,
-      c1.Diff ||
-      c2.Diff
-    ] =
-    CanEq {
-      (l, rhs) ⇒
-        val r = map(rhs)
-        c1(
-          l
-            .map
-            .toMap,
-          r
-            .mapValues { _._1 }
-        ) ||
-        c2(
-          l
-            .versionedMap
-            .toMap
-            .mapValues {
-              case Value(v, g) ⇒ (v, g.asInstanceOf[Long])
-            },
-          r
-        )
-    }
-}
-object Cmps extends Cmps

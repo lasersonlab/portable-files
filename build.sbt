@@ -13,8 +13,7 @@ default(
 )
 
 lazy val concurrent =
-  //cross
-  project.in(new File("concurrent/shared"))
+  cross
     .settings(
       v"0.2.0",
       scalac.xms(1 GB),
@@ -23,84 +22,82 @@ lazy val concurrent =
         case_app,
         cats,
         hammerlab.types,
-        //"org.log4s" ^^ "log4s" ^ "1.7.0"
       ),
       hammerlab.test.version := "2.0.0".snapshot,
       takeFirstLog4JProperties,
-//    )
-//    .jvmSettings(
+    )
+    .jvmSettings(
       dep(
         slf4j.slogging,
         slf4j.log4j tests,
       )
     )
-//    .jsSettings(
-//      dep(
-//        slogging
-//      )
-//    )
-//lazy val `concurrent-x` = concurrent.x
+    .jsSettings(
+      dep(
+        slogging
+      )
+    )
+lazy val `concurrent-x` = concurrent.x
 
-//lazy val files =
-//  cross
-//    .settings(
-//      v"0.2.0",
-//      name := "portable-files",
-//      dep(
-//        cats,
-//        cats.effect,
-//
-//        circe,
-//        circe.generic,
-//        circe.generic.extras,
-//        circe.parser,
-//
-//        fs2,
-//
-//        hammerlab.types,
-//        hammerlab.math.utils,
-//
-//        sourcecode,
-//        sttp,
-//        time,
-//      ),
-//      enableMacroParadise,
-//      publishTestJar,
-//      utest
-//    )
-//    .jvmSettings(
-//      http4s.version := "0.19.0",
-//      dep(
-//        akka.actor,
-//        akka.stream,
-//        akka.http,
-//        akka.http.core,
-//
-//        commons.io,
-//
-//        http4s. dsl,
-//        http4s.`blaze-client`,
-//
-//        slf4j.slogging,
-//        slf4j.simple,
-//      )
-//    )
-//    .jsSettings(
-//      scalaJSUseMainModuleInitializer := true,
-//      dep(
-//        slogging,
-//        dom,
-//        "io.scalajs.npm" ^^ "request" ^ "0.4.2"
-//      ),
-//    )
-//    .dependsOn(
-//      concurrent
-//    )
-//lazy val `files-x` = files.x
+lazy val files =
+  cross
+    .settings(
+      v"0.2.0",
+      name := "portable-files",
+      dep(
+        cats,
+        cats.effect,
+
+        circe,
+        circe.generic,
+        circe.generic.extras,
+        circe.parser,
+
+        fs2,
+
+        hammerlab.types,
+        hammerlab.math.utils,
+
+        sourcecode,
+        sttp,
+        time,
+      ),
+      enableMacroParadise,
+      publishTestJar,
+      utest
+    )
+    .jvmSettings(
+      http4s.version := "0.19.0",
+      dep(
+        akka.actor,
+        akka.stream,
+        akka.http,
+        akka.http.core,
+
+        commons.io,
+
+        http4s. dsl,
+        http4s.`blaze-client`,
+
+        slf4j.slogging,
+        slf4j.simple,
+      )
+    )
+    .jsSettings(
+      scalaJSUseMainModuleInitializer := true,
+      dep(
+        slogging,
+        dom,
+        "io.scalajs.npm" ^^ "request" ^ "0.4.2"
+      ),
+    )
+    .dependsOn(
+      concurrent
+    )
+lazy val `files-x` = files.x
 
 lazy val `portable-files` =
   root(
-    concurrent
-//     `concurrent-x` ,
-//          `files-x` ,
+     `concurrent-x` ,
+          `files-x` ,
   )
